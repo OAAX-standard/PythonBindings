@@ -1,0 +1,20 @@
+RuntimeDownloads/*
+!RuntimeDownloads/.gitkeep
+ModelDownloads/*
+!ModelDownloads/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime side effects (e.g. an OAAX runtime's own logs/model cache, written
+# to the working directory when a test's --config doesn't redirect them)
+runtime.log
+*.log
+*.blob
