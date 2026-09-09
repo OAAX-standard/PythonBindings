@@ -16,8 +16,7 @@ import numpy as np
 import pytest
 
 from oaax import Runtime, RuntimeStatus, RuntimeStatusError, Tensor, TensorElementType, TensorSpec, element_type_to_dtype, parse_dtype_name
-
-from _onnx_introspect import read_onnx_io
+from oaax.onnx_introspect import model_io
 
 TIMEOUT_MS = 60_000
 
@@ -40,24 +39,6 @@ def random_tensor(spec: TensorSpec, rng: np.random.Generator) -> Tensor:
     else:  # pragma: no cover - the dtype table only contains the kinds above
         raise TypeError(f"no random generator for dtype {dtype}")
     return Tensor(spec.name, data)
-
-
-def model_io(rt: Runtime, model_id: int, model_path: Path) -> tuple[tuple[list[TensorSpec], list[TensorSpec]] | None, str | None]:
-    """Input/output specs from the runtime, falling back to reading an ``.onnx`` file directly.
-
-    ``runtime_get_info()`` describing model I/O is optional per the interface;
-    when a runtime doesn't bother and the model handed to it is itself ONNX,
-    reading the graph's ``input``/``output`` value_infos gets the same
-    information without needing the runtime's cooperation.
-
-    Returns ``(specs, None)`` on success or ``(None, reason)`` when neither
-    source could help, ``reason`` being a short explanation of why (not an
-    .onnx file, ``onnx`` not installed, a parse error, ...) for logging.
-    """
-    io = rt.model_io(model_id)
-    if io is not None:
-        return io, None
-    return read_onnx_io(model_path)
 
 
 def resolve_input_specs(rt: Runtime, model_id: int, model_path: Path, explicit) -> list[TensorSpec]:

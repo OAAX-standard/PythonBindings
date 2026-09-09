@@ -13,9 +13,11 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
-# Lets the test suite read input/output specs straight from an .onnx model
-# file when the runtime under test doesn't report them via runtime_get_info().
+# Lets oaax.onnx_introspect read a model's input/output specs straight from
+# an .onnx file when a runtime doesn't report them via runtime_get_info().
 onnx = ["onnx>=1.14"]
+# Extra dependencies used by the sample scripts under Examples/.
+examples = ["pillow>=10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,36 +1,39 @@
-"""Best-effort fallback: read a model's input/output tensor specs straight out
-of an ONNX file, for use when a runtime's own ``runtime_get_info()`` doesn't
-describe them (that's optional per the OAAX interface, and plenty of
-compliant runtimes report little more than a model count).
+"""Optional helper: read a model's tensor specs from an ONNX file directly,
+for use when a runtime's own ``runtime_get_info()`` doesn't describe its
+inputs/outputs (that's optional per the interface, and plenty of compliant
+runtimes report little more than a model count).
 
-This lives in ``tests/``, not in the ``oaax`` package: it's a convenience for
-writing test input data, not part of the interface, and it keeps the core
-package free of an ``onnx`` dependency. It only helps when the model you
-handed the runtime is itself an ``.onnx`` file; a vendor's compiled archive or
-IR (``.zip``, ``.xml``/``.bin``, ...) can't be introspected this way.
+This is separate from the rest of the package because it needs the ``onnx``
+package (the ``onnx`` extra: ``pip install -e ".[onnx]"``). Importing this
+module never requires ``onnx`` to be installed; only calling
+:func:`read_onnx_io` does, and it fails soft (see below) rather than raising.
+It only helps when the model handed to the runtime is itself an ``.onnx``
+file; a vendor's compiled archive or IR (``.zip``, ``.xml``/``.bin``, ...)
+can't be introspected this way.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from oaax import TensorElementType
-from oaax.runtime import TensorSpec
+from .enums import TensorElementType
+from .runtime import Runtime, TensorSpec
 
-__all__ = ["read_onnx_io"]
+__all__ = ["read_onnx_io", "model_io"]
 
 IoSpecs = tuple[list[TensorSpec], list[TensorSpec]]
 
 
-def read_onnx_io(path: Path) -> tuple[IoSpecs | None, str | None]:
+def read_onnx_io(path: str | Path) -> tuple[IoSpecs | None, str | None]:
     """Try to read ``(inputs, outputs)`` from an ONNX file.
 
     Returns ``(specs, None)`` on success or ``(None, reason)`` on failure,
     where ``reason`` is a short, user-facing explanation of why this fallback
-    couldn't help - not a file-not-onnx or missing-dependency error, just
-    information for whoever has to decide what to do next (typically: pass
-    ``--input``/``--output`` explicitly).
+    couldn't help (not an ``.onnx`` file, ``onnx`` not installed, a parse
+    error, ...) - useful for telling the caller what to do next, typically
+    describe the model's tensors some other way.
     """
+    path = Path(path)
     if path.suffix.lower() != ".onnx":
         return None, f"{path.name} is not an .onnx file, so it can't be introspected"
 
@@ -67,3 +70,16 @@ def read_onnx_io(path: Path) -> tuple[IoSpecs | None, str | None]:
         return (specs(model.graph.input), specs(model.graph.output)), None
     except Exception as exc:  # malformed/unreadable ONNX file, unexpected protobuf shape, ...
         return None, f"failed to read tensor info from {path.name}: {exc}"
+
+
+def model_io(rt: Runtime, model_id: int, model_path: str | Path) -> tuple[IoSpecs | None, str | None]:
+    """``rt.model_io(model_id)``, falling back to :func:`read_onnx_io` on ``model_path``.
+
+    Returns ``(specs, None)`` on success or ``(None, reason)`` when neither
+    the runtime nor (for an ``.onnx`` model) the file itself could describe
+    the model's tensors.
+    """
+    io = rt.model_io(model_id)
+    if io is not None:
+        return io, None
+    return read_onnx_io(model_path)
