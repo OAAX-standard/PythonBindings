@@ -1,0 +1,3 @@
+[submodule "OAAX"]
+	path = OAAX
+	url = git@github.com:OAAX-standard/OAAX.git
