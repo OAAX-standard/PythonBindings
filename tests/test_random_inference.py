@@ -9,12 +9,15 @@ See ``conftest.py`` for the full set of options (``--config``, ``--input``).
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from oaax import Runtime, RuntimeStatus, RuntimeStatusError, Tensor, TensorElementType, TensorSpec, element_type_to_dtype, parse_dtype_name
+
+from _onnx_introspect import read_onnx_io
 
 TIMEOUT_MS = 60_000
 
@@ -39,7 +42,25 @@ def random_tensor(spec: TensorSpec, rng: np.random.Generator) -> Tensor:
     return Tensor(spec.name, data)
 
 
-def resolve_input_specs(rt: Runtime, model_id: int, explicit) -> list[TensorSpec]:
+def model_io(rt: Runtime, model_id: int, model_path: Path) -> tuple[tuple[list[TensorSpec], list[TensorSpec]] | None, str | None]:
+    """Input/output specs from the runtime, falling back to reading an ``.onnx`` file directly.
+
+    ``runtime_get_info()`` describing model I/O is optional per the interface;
+    when a runtime doesn't bother and the model handed to it is itself ONNX,
+    reading the graph's ``input``/``output`` value_infos gets the same
+    information without needing the runtime's cooperation.
+
+    Returns ``(specs, None)`` on success or ``(None, reason)`` when neither
+    source could help, ``reason`` being a short explanation of why (not an
+    .onnx file, ``onnx`` not installed, a parse error, ...) for logging.
+    """
+    io = rt.model_io(model_id)
+    if io is not None:
+        return io, None
+    return read_onnx_io(model_path)
+
+
+def resolve_input_specs(rt: Runtime, model_id: int, model_path: Path, explicit) -> list[TensorSpec]:
     if explicit:
         specs = []
         for name, dtype, shape in explicit:
@@ -48,11 +69,14 @@ def resolve_input_specs(rt: Runtime, model_id: int, explicit) -> list[TensorSpec
                 raise pytest.UsageError(f"unknown dtype {dtype!r} in --input for {name!r}")
             specs.append(TensorSpec(name, element_type, shape))
         return specs
-    io = rt.model_io(model_id)
+    io, reason = model_io(rt, model_id, model_path)
     if io is None or not io[0]:
+        detail = reason if io is None else "runtime_get_info() and the model file both report zero input tensors"
         pytest.fail(
-            "runtime_get_info() does not describe the model's inputs; "
-            "pass --input name:dtype:d0,d1,... so the test knows what to feed the model"
+            f"Could not determine the model's input tensors automatically: {detail}.\n"
+            "Specify them yourself with --input \"name:dtype:d0,d1,...\" (repeatable), "
+            "e.g. --input \"image:float32:1,3,224,224\".",
+            pytrace=False,
         )
     return io[0]
 
@@ -97,9 +121,9 @@ def test_loading_missing_model_raises(runtime: Runtime, tmp_path: Path) -> None:
     assert excinfo.value.status is not RuntimeStatus.SUCCESS
 
 
-def test_random_input_produces_output(runtime: Runtime, model_id: int, explicit_input_specs) -> None:
+def test_random_input_produces_output(runtime: Runtime, model_id: int, model_path: Path, explicit_input_specs) -> None:
     rng = np.random.default_rng(seed=1234)
-    specs = resolve_input_specs(runtime, model_id, explicit_input_specs)
+    specs = resolve_input_specs(runtime, model_id, model_path, explicit_input_specs)
     inputs = [random_tensor(spec, rng) for spec in specs]
 
     result = runtime.run(model_id, inputs, timeout_ms=TIMEOUT_MS)
@@ -107,7 +131,14 @@ def test_random_input_produces_output(runtime: Runtime, model_id: int, explicit_
     assert result.model_id == model_id
     assert result.outputs, "runtime returned zero output tensors"
 
-    io = runtime.model_io(model_id)
+    io, reason = model_io(runtime, model_id, model_path)
+    if io is None:
+        warnings.warn(
+            f"Could not determine the model's output tensors automatically ({reason}); "
+            "skipping the output name/shape cross-check. This does not fail the test: "
+            "only the input side is required to run inference.",
+            stacklevel=1,
+        )
     reported_outputs = {spec.name: spec for spec in (io[1] if io else [])}
 
     for tensor in result.outputs:
@@ -134,9 +165,9 @@ def test_random_input_produces_output(runtime: Runtime, model_id: int, explicit_
         assert sorted(result.names) == sorted(reported_outputs)
 
 
-def test_request_ids_are_echoed_for_pipelined_requests(runtime: Runtime, model_id: int, explicit_input_specs) -> None:
+def test_request_ids_are_echoed_for_pipelined_requests(runtime: Runtime, model_id: int, model_path: Path, explicit_input_specs) -> None:
     rng = np.random.default_rng(seed=99)
-    specs = resolve_input_specs(runtime, model_id, explicit_input_specs)
+    specs = resolve_input_specs(runtime, model_id, model_path, explicit_input_specs)
     submitted = [runtime.enqueue(model_id, [random_tensor(s, rng) for s in specs]) for _ in range(4)]
 
     received = []

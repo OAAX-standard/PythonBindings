@@ -118,8 +118,12 @@ Tests skip with an explanation if `--library`/`--model` (or the matching
 environment variables) aren't given, or point at a missing file.
 
 The test reads the model's input names, types and shapes from
-`runtime_get_info()`. For runtimes that don't report them, spell the inputs
-out: `--input "name:dtype:d0,d1,..."` (repeatable).
+`runtime_get_info()`, which is optional per the interface: plenty of
+compliant runtimes report little more than a model count. If the model you
+handed the runtime is itself an `.onnx` file, the test falls back to reading
+its input/output `value_info` directly (needs `pip install -e .[onnx]`).
+Failing both, spell the inputs out yourself: `--input "name:dtype:d0,d1,..."`
+(repeatable).
 
 Pass runtime-specific init options with `--config key=value` (repeatable),
 e.g. `--config device_type=GPU --config log_level=1`.

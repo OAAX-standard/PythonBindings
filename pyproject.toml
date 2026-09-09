@@ -13,7 +13,9 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
-convert = ["openvino>=2025.0"]
+# Lets the test suite read input/output specs straight from an .onnx model
+# file when the runtime under test doesn't report them via runtime_get_info().
+onnx = ["onnx>=1.14"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
