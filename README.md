@@ -13,7 +13,7 @@ model format.
 | --- | --- |
 | `src/oaax/` | The Python package (`import oaax`). |
 | `tests/` | Pytest smoke test: load a library, feed random data, check the output. You supply the library and model. |
-| `Examples/` | Sample scripts showing the package in use, e.g. `Examples/Vision/Faces/` runs a face detector on an image. |
+| `Examples/` | Sample scripts showing the package in use: `Examples/Vision/Faces/` detects faces in an image, `Examples/Vision/OCR/` reads a line of text from one. |
 | `Examples/Vision/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and preprocessing. |
 | `OAAX/` | The OAAX specification repository as a git submodule (branch `oaax-2.0`). |
 
