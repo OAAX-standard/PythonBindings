@@ -1,0 +1,15 @@
+{
+  "name": "Whisper-Tiny-English",
+  "encoder": "encoder.onnx",
+  "decoder": "decoder.onnx",
+  "tokenizer": "tokenizer.json",
+  "start_tokens": ["<|startoftranscript|>", "<|notimestamps|>"],
+  "end_token": "<|endoftext|>",
+  "audio": {
+    "sample_rate": 16000,
+    "n_fft": 400,
+    "hop_length": 160,
+    "chunk_seconds": 30,
+    "mel_filters": "mel_filters.npy"
+  }
+}
