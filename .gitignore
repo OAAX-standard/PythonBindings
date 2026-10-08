@@ -1,5 +1,4 @@
 RuntimeDownloads/*
-!RuntimeDownloads/.gitkeep
 !RuntimeDownloads/download_runtime.py
 ModelDownloads/*
 !ModelDownloads/.gitkeep
