@@ -4,6 +4,12 @@ RuntimeDownloads/*
 ModelDownloads/*
 !ModelDownloads/.gitkeep
 
+# Model weights/tokenizers fetched by each Examples/*/Models/<Name>/download_model.py;
+# model.json (hand-authored metadata) and the download script itself stay tracked.
+Examples/*/Models/*/*
+!Examples/*/Models/*/model.json
+!Examples/*/Models/*/download_model.py
+
 # Python
 __pycache__/
 *.py[cod]

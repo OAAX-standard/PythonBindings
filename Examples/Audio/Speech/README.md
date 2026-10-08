@@ -22,10 +22,11 @@ library; everything about the model comes from `../Models/Whisper-Tiny-English/`
 
 | File | Purpose |
 | --- | --- |
-| `encoder.onnx`, `decoder.onnx` | Whisper `tiny.en` (OpenAI, MIT), 8-bit quantised ONNX exports from Hugging Face's `Xenova` org |
-| `tokenizer.json` | the model's own tokenizer, to turn its word-piece ids back into text |
-| `mel_filters.npy` | the model's mel filterbank (`[201, 80]`), so the spectrogram needs only a numpy FFT |
+| `encoder.onnx`, `decoder.onnx` | Whisper `tiny.en` (OpenAI, MIT), 8-bit quantised ONNX exports from Hugging Face's `Xenova` org - not checked in, fetched by `download_model.py` |
+| `tokenizer.json` | the model's own tokenizer, to turn its word-piece ids back into text - also fetched by `download_model.py` |
+| `mel_filters.npy` | the model's mel filterbank (`[201, 80]`), so the spectrogram needs only a numpy FFT - derived by `download_model.py` from OpenAI's own published filterbank |
 | `model.json` | which file is which, the start/end tokens, and the audio settings |
+| `download_model.py` | fetches/derives the three files above |
 
 The bundled `speech.wav` is utterance `1272-128104-0000` from the LibriSpeech
 corpus (Panayotov et al., 2015; CC BY 4.0), dev-clean split, 5.9 s. Its
@@ -35,8 +36,12 @@ reference transcript is
 ## Setup
 
 ```bash
-pip install -e ".[examples]"   # from the repo root: adds the tokenizers package
+pip install -e ".[examples]"                        # from the repo root: adds the tokenizers package
+python ../Models/Whisper-Tiny-English/download_model.py   # fetches the model/tokenizer, derives the mel filterbank
 ```
+
+None of those files are checked into the repo; the script fetches/derives
+them and is safe to re-run, it skips anything already present.
 
 ## Run
 

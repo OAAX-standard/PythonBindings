@@ -11,15 +11,21 @@ Runtime-backed CPU runtime, ...). Everything it needs to know about the
 
 | File | Purpose |
 | --- | --- |
-| `model.onnx` | DistilBERT fine-tuned on SST-2 (`distilbert-base-uncased-finetuned-sst-2-english`, Apache-2.0), 8-bit quantised ONNX export from Hugging Face's `Xenova` org |
-| `tokenizer.json` | the model's own tokenizer, which turns text into the token ids it was trained on |
+| `model.onnx` | DistilBERT fine-tuned on SST-2 (`distilbert-base-uncased-finetuned-sst-2-english`, Apache-2.0), 8-bit quantised ONNX export from Hugging Face's `Xenova` org - not checked in, fetched by `download_model.py` |
+| `tokenizer.json` | the model's own tokenizer, which turns text into the token ids it was trained on - also fetched by `download_model.py` |
 | `model.json` | the metadata the script reads |
+| `download_model.py` | fetches the two files above |
 
 ## Setup
 
 ```bash
-pip install -e ".[examples]"   # from the repo root: adds the tokenizers package
+pip install -e ".[examples]"                        # from the repo root: adds the tokenizers package
+python ../Models/Sentiment-Classification/download_model.py   # fetches model.onnx and tokenizer.json
 ```
+
+Neither file is checked into the repo; the script downloads them (see
+[Model metadata](#model-metadata) for where from) and is safe to re-run, it
+skips anything already present.
 
 ## Run
 

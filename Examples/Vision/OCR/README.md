@@ -11,9 +11,10 @@ Runtime-backed CPU runtime, ...). Everything it needs to know about the
 
 | File | Purpose |
 | --- | --- |
-| `model.onnx` | PaddleOCR PP-OCRv4 text recogniser (Chinese + English, Apache-2.0), as shipped by RapidOCR |
-| `characters.txt` | the 6623 characters it can output, one per line, in class order |
+| `model.onnx` | PaddleOCR PP-OCRv4 text recogniser (Chinese + English, Apache-2.0), as shipped inside the `rapidocr_onnxruntime` PyPI package - not checked in, fetched by `download_model.py` |
+| `characters.txt` | the 6623 characters it can output, one per line, in class order (PaddleOCR's `ppocr_keys_v1.txt`) - also fetched by `download_model.py` |
 | `model.json` | the metadata the script reads |
+| `download_model.py` | fetches the two files above |
 
 This is recognition only: it expects an image that already contains just one
 line of text, like the bundled `text.png`. Finding the lines in a larger image
@@ -23,8 +24,12 @@ scope here.
 ## Setup
 
 ```bash
-pip install -e ".[examples]"   # from the repo root: adds Pillow
+pip install -e ".[examples]"                   # from the repo root: adds Pillow
+python ../Models/Text-Recognition/download_model.py   # fetches model.onnx and characters.txt
 ```
+
+Neither file is checked into the repo; the script downloads them and is
+safe to re-run, it skips anything already present.
 
 ## Run
 
