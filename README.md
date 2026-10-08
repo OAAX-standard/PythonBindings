@@ -25,6 +25,14 @@ No runtime library is checked in; point the package, tests and examples at
 whatever runtime you're working with. The only bundled models are the small
 ones under `Examples/Vision/Models/` that the examples need.
 
+For the generic (non-vendor-specific) CPU runtime, `RuntimeDownloads/download_runtime.py`
+fetches the right prebuilt archive for your OS/architecture and unpacks it
+into `RuntimeDownloads/CPU/`:
+
+```bash
+python RuntimeDownloads/download_runtime.py
+```
+
 ## Installation
 
 ```bash
