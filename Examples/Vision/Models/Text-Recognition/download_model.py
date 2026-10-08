@@ -20,8 +20,8 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for model_fetch
-from model_fetch import fetch, fetch_zip_member  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for download_model_utils
+from download_model_utils import fetch, fetch_zip_member  # noqa: E402
 
 HERE = Path(__file__).parent
 

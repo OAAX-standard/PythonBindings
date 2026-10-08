@@ -24,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for model_fetch
-from model_fetch import fetch  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for download_model_utils
+from download_model_utils import fetch  # noqa: E402
 
 HERE = Path(__file__).parent
 HF_REPO = "https://huggingface.co/Xenova/whisper-tiny.en/resolve/main"

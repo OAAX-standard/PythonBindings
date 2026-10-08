@@ -15,8 +15,8 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for model_fetch
-from model_fetch import fetch  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # Examples/, for download_model_utils
+from download_model_utils import fetch  # noqa: E402
 
 HERE = Path(__file__).parent
 REPO = "https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main"

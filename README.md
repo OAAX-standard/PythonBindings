@@ -24,13 +24,10 @@ submodule.
 No runtime library is checked in; point the package, tests and examples at
 whatever runtime you're working with. Model weights/tokenizers sourced from
 the web aren't checked in either - run that model's `download_model.py`
-first (each example's own README says so too):
+first (each example's own README says so too), or fetch every one at once:
 
 ```bash
-python Examples/Text/Models/Sentiment-Classification/download_model.py
-python Examples/Text/Models/Sentence-Embeddings/download_model.py
-python Examples/Audio/Models/Whisper-Tiny-English/download_model.py
-python Examples/Vision/Models/Text-Recognition/download_model.py
+python Examples/download_all_models.py
 ```
 
 For the generic (non-vendor-specific) CPU runtime, `RuntimeDownloads/download_runtime.py`
