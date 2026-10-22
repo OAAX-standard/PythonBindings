@@ -29,7 +29,7 @@ class RuntimeStatus(IntEnum):
     INVALID_MODEL_ID = 18
 
     @classmethod
-    def _missing_(cls, value: object) -> "RuntimeStatus | None":
+    def _missing_(cls, value: object) -> RuntimeStatus | None:
         # A newer runtime may return a code this binding does not know yet.
         # Map it onto a pseudo-member so callers still get a RuntimeStatus.
         if isinstance(value, int):
@@ -72,7 +72,7 @@ class TensorElementType(IntEnum):
     INT2 = 26
 
     @classmethod
-    def _missing_(cls, value: object) -> "TensorElementType | None":
+    def _missing_(cls, value: object) -> TensorElementType | None:
         if isinstance(value, int):
             member = int.__new__(cls, value)
             member._name_ = f"UNKNOWN_TYPE_{value}"

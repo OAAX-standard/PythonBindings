@@ -80,7 +80,7 @@ def main() -> None:
         # the scores at the last position. (A cached variant would only feed the newest
         # token; this way needs no cache handling and is fast enough for a sentence.)
         tokens = list(start_tokens)
-        for decoder_runs in range(1, args.max_tokens + 1):
+        for decoder_runs in range(1, args.max_tokens + 1):  # noqa: B007 - its final value is reported after the loop
             decoder_result = runtime.run(
                 decoder_id,
                 {"input_ids": np.asarray([tokens], dtype=np.int64), "encoder_hidden_states": audio_vectors},

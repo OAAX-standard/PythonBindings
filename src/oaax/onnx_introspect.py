@@ -41,8 +41,7 @@ def read_onnx_io(path: str | Path) -> tuple[IoSpecs | None, str | None]:
         import onnx
     except ImportError:
         return None, (
-            f"{path.name} is an .onnx file, but the 'onnx' package isn't installed "
-            "(pip install -e '.[onnx]', or pip install onnx, to enable this fallback)"
+            f"{path.name} is an .onnx file, but the 'onnx' package isn't installed (pip install -e '.[onnx]', or pip install onnx, to enable this fallback)"
         )
 
     try:

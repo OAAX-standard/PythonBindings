@@ -31,13 +31,14 @@ long as you haven't pushed yet.
 ## Development environment
 
 ```bash
-pip install -e ".[test,onnx,examples]"
+pip install -e ".[test,onnx,examples,lint]"
 ```
 
 This installs the package itself plus `pytest` (`test`), `onnx` for the
-ONNX-introspection fallback (`onnx`), and Pillow/`tokenizers` for the sample
-scripts under `examples/` (`examples`). Running from a checkout without
-installing also works: `tests/conftest.py` adds `src/` to `sys.path`.
+ONNX-introspection fallback (`onnx`), Pillow/`tokenizers` for the sample
+scripts under `examples/` (`examples`), and `ruff` (`lint`). Running from a
+checkout without installing also works: `tests/conftest.py` adds `src/` to
+`sys.path`.
 
 ### Running the tests
 
@@ -49,6 +50,20 @@ pytest tests --library path/to/RuntimeLibrary.dll --model path/to/model
 
 See the [Tests section of the README](README.md#tests) for the full set of
 options (`--config`, `--input`, environment variable equivalents, ...).
+
+### Linting
+
+[`run-linter.yml`](.github/workflows/run-linter.yml) runs these same two
+commands on every push and pull request; run them yourself first so CI isn't
+the first place a problem shows up:
+
+```bash
+ruff check src/ tests/ examples/ runtime-downloads/
+ruff format --check src/ tests/ examples/ runtime-downloads/   # drop --check to apply the formatting
+```
+
+Settings (line length, rule set, target Python version) live in
+`pyproject.toml` under `[tool.ruff]`, not on the command line.
 
 ### Trying the examples
 

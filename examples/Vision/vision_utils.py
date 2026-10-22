@@ -239,7 +239,7 @@ def _generate_priors() -> np.ndarray:
     image_width, image_height = _PRIOR_IMAGE_SIZE
     priors = [
         (center_x, center_y, anchor_size / image_width, anchor_size / image_height)
-        for (cells_wide, cells_high), anchor_sizes in zip(_PRIOR_FEATURE_MAP_SIZES, _PRIOR_ANCHOR_SIZES_PX)
+        for (cells_wide, cells_high), anchor_sizes in zip(_PRIOR_FEATURE_MAP_SIZES, _PRIOR_ANCHOR_SIZES_PX, strict=True)  # one layer config each
         for row in range(cells_high)
         for col in range(cells_wide)
         for center_x, center_y in [((col + 0.5) / cells_wide, (row + 0.5) / cells_high)]
@@ -285,7 +285,7 @@ def decode_ultraface_detections(
         candidate_boxes, candidate_scores = decoded_boxes[keep], class_scores[keep, class_id]
         picked = _non_max_suppression(candidate_boxes, candidate_scores, iou_threshold)
         label = labels[class_id] if labels and class_id < len(labels) else f"class {class_id}"
-        for (x1, y1, x2, y2), score in zip(candidate_boxes[picked], candidate_scores[picked]):
+        for (x1, y1, x2, y2), score in zip(candidate_boxes[picked], candidate_scores[picked], strict=True):  # both indexed by `picked`
             detections.append((label, float(score), (float(x1) * width, float(y1) * height, float(x2) * width, float(y2) * height)))
 
     if not detections:

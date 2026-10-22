@@ -64,8 +64,8 @@ def resolve_input_specs(rt: Runtime, model_id: int, model_path: Path, explicit) 
         detail = reason if io is None else "runtime_get_info() and the model file both report zero input tensors"
         pytest.fail(
             f"Could not determine the model's input tensors automatically: {detail}.\n"
-            "Specify them yourself with --input \"name:dtype:d0,d1,...\" (repeatable), "
-            "e.g. --input \"image:float32:1,3,224,224\".",
+            'Specify them yourself with --input "name:dtype:d0,d1,..." (repeatable), '
+            'e.g. --input "image:float32:1,3,224,224".',
             pytrace=False,
         )
     return io[0]
@@ -146,7 +146,7 @@ def test_random_input_produces_output(runtime: Runtime, model_id: int, model_pat
             # Static dims must match exactly; dynamic dims (-1) may be anything,
             # including 0: a detector fed random noise legitimately finds nothing.
             assert len(tensor.shape) == len(spec.shape), f"rank mismatch for {tensor.name!r}"
-            for actual, expected in zip(tensor.shape, spec.shape):
+            for actual, expected in zip(tensor.shape, spec.shape, strict=True):  # same rank, just asserted above
                 assert expected < 0 or actual == expected, f"shape {tensor.shape} != {spec.shape} for {tensor.name!r}"
             if all(d > 0 for d in spec.shape):
                 assert tensor.data.nbytes > 0, f"output {tensor.name!r} is empty"

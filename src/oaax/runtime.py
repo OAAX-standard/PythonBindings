@@ -9,7 +9,7 @@ import os
 import re
 import threading
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -353,7 +353,7 @@ class Runtime:
         self._model_io_cache.clear()
         self._check("runtime_cleanup", code)
 
-    def __enter__(self) -> "Runtime":
+    def __enter__(self) -> Runtime:
         return self
 
     def __exit__(self, *exc_info) -> None:
@@ -507,8 +507,9 @@ class Runtime:
         result = self.wait_for(request_id, timeout_ms)
         if result is None:
             hint = (
-                "" if self._cached_model_io(model_id) is not None else
-                " (this runtime doesn't report this model's expected inputs, so enqueue() couldn't check "
+                ""
+                if self._cached_model_io(model_id) is not None
+                else " (this runtime doesn't report this model's expected inputs, so enqueue() couldn't check "
                 "them ahead of time: if this model doesn't actually need this long, a wrong input name silently "
                 "dropped by the runtime is a common cause - double-check the names against the model itself)"
             )

@@ -102,10 +102,7 @@ class Tensor:
         return element_type_to_dtype(self.element_type) != self.data.dtype
 
     def __repr__(self) -> str:
-        return (
-            f"Tensor(name={self.name!r}, element_type={self.element_type.name}, "
-            f"shape={self.shape}, dtype={self.data.dtype})"
-        )
+        return f"Tensor(name={self.name!r}, element_type={self.element_type.name}, shape={self.shape}, dtype={self.data.dtype})"
 
 
 def normalize_inputs(inputs) -> list[Tensor]:

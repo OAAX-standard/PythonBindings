@@ -27,7 +27,9 @@ HERE = Path(__file__).parent
 
 # A specific rapidocr_onnxruntime wheel release (just a .zip under the hood),
 # pinned so this keeps working even after newer releases change what's bundled.
-RAPIDOCR_WHEEL_URL = "https://files.pythonhosted.org/packages/ba/12/1e5497183bdbe782dbb91bad1d0d2297dba4d2831b2652657f7517bfc6df/rapidocr_onnxruntime-1.4.4-py3-none-any.whl"
+RAPIDOCR_WHEEL_URL = (
+    "https://files.pythonhosted.org/packages/ba/12/1e5497183bdbe782dbb91bad1d0d2297dba4d2831b2652657f7517bfc6df/rapidocr_onnxruntime-1.4.4-py3-none-any.whl"
+)
 RAPIDOCR_MEMBER = "rapidocr_onnxruntime/models/ch_PP-OCRv4_rec_infer.onnx"
 MODEL_SHA256 = "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b"
 

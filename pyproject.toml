@@ -19,6 +19,7 @@ onnx = ["onnx>=1.14"]
 # Extra dependencies used by the sample scripts under examples/: Pillow for the
 # vision examples' image I/O, tokenizers for the text examples' tokenizer.json files.
 examples = ["pillow>=10", "tokenizers>=0.15"]
+lint = ["ruff>=0.17"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -34,3 +35,10 @@ version = { file = "VERSION" }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 160
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

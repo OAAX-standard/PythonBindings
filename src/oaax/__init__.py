@@ -14,7 +14,8 @@ from Python with NumPy arrays::
             print(tensor.name, tensor.data.shape, tensor.data.dtype)
 """
 
-from importlib.metadata import PackageNotFoundError, version as _version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
 from pathlib import Path
 
 from .enums import RuntimeStatus, TensorElementType
