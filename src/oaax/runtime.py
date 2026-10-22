@@ -190,6 +190,10 @@ class Runtime:
         self._lock = threading.Lock()
         # Results retrieved while waiting for a *different* request id.
         self._stash: dict[int, InferenceResult] = {}
+        # model_io() results, cached per model_id so enqueue()'s input-name
+        # check (see _validate_input_names) doesn't re-parse runtime_get_info()
+        # on every call.
+        self._model_io_cache: dict[int, tuple[list[TensorSpec], list[TensorSpec]] | None] = {}
 
     # ------------------------------------------------------------------ meta
 
@@ -287,6 +291,7 @@ class Runtime:
         self._initialized = True
         self._model_count = 0
         self._stash.clear()
+        self._model_io_cache.clear()
 
     def load_models(self, models: Iterable[ModelConfig | str | os.PathLike[str] | bytes]) -> list[int]:
         """``runtime_load_models()`` for several models at once.
@@ -345,6 +350,7 @@ class Runtime:
         self._initialized = False
         self._model_count = 0
         self._stash.clear()
+        self._model_io_cache.clear()
         self._check("runtime_cleanup", code)
 
     def __enter__(self) -> "Runtime":
@@ -362,6 +368,44 @@ class Runtime:
 
     # ------------------------------------------------------------- inference
 
+    def _cached_model_io(self, model_id: int) -> tuple[list[TensorSpec], list[TensorSpec]] | None:
+        """:meth:`model_io`, computed once per model and reused (cleared by :meth:`init`/:meth:`cleanup`)."""
+        if model_id not in self._model_io_cache:
+            self._model_io_cache[model_id] = self.model_io(model_id)
+        return self._model_io_cache[model_id]
+
+    def _validate_input_names(self, model_id: int, tensors: list[Tensor]) -> None:
+        """Check ``tensors``' names against this model's own reported inputs, when it reports any.
+
+        Reporting its inputs is optional for a runtime (most don't), so this
+        silently does nothing when :meth:`model_io` is unavailable - there is
+        nothing to check a name against. When it is available, catching a
+        wrong or misspelled input name here, before it ever reaches the
+        runtime, matters: the interface lets a runtime simply drop a request
+        whose input names it doesn't recognise rather than reporting an
+        error, which otherwise surfaces much later as a confusing timeout
+        with no indication of the real cause (see :meth:`run`).
+        """
+        io = self._cached_model_io(model_id)
+        if io is None or not io[0]:
+            return
+        expected_names = {spec.name for spec in io[0]}
+        given_names = {tensor.name for tensor in tensors}
+        if given_names == expected_names:
+            return
+        problems = []
+        missing = expected_names - given_names
+        if missing:
+            problems.append(f"missing {sorted(missing)}")
+        unexpected = given_names - expected_names
+        if unexpected:
+            problems.append(f"unexpected {sorted(unexpected)}")
+        raise ValueError(
+            f"model {model_id} expects inputs {sorted(expected_names)}, got {sorted(given_names)} ({'; '.join(problems)}). "
+            "Sending the wrong name is accepted by the interface but silently dropped by some runtimes, producing "
+            "a confusing timeout instead of a clear error - that's why this is caught here instead."
+        )
+
     def enqueue(self, model_id: int, inputs, request_id: int | None = None) -> int:
         """``runtime_enqueue_input()``: submit inputs for asynchronous inference.
 
@@ -375,10 +419,17 @@ class Runtime:
 
         Returns:
             The request id.
+
+        Raises:
+            ValueError: if the runtime reports this model's expected input
+                names (via ``runtime_get_info()``) and ``inputs`` doesn't
+                name exactly those. Not every runtime reports this, so this
+                check is best-effort, not a guarantee.
         """
         if request_id is None:
             request_id = next(self._request_ids)
         tensors = normalize_inputs(inputs)
+        self._validate_input_names(model_id, tensors)
         ptr = build_input_tensors(tensors, request_id)
         code = self._lib.runtime_enqueue_input(int(model_id), ptr)
         status = RuntimeStatus(code)
@@ -455,7 +506,13 @@ class Runtime:
         request_id = self.enqueue(model_id, inputs)
         result = self.wait_for(request_id, timeout_ms)
         if result is None:
-            raise TimeoutError(f"No output for request {request_id} within {timeout_ms} ms")
+            hint = (
+                "" if self._cached_model_io(model_id) is not None else
+                " (this runtime doesn't report this model's expected inputs, so enqueue() couldn't check "
+                "them ahead of time: if this model doesn't actually need this long, a wrong input name silently "
+                "dropped by the runtime is a common cause - double-check the names against the model itself)"
+            )
+            raise TimeoutError(f"No output for request {request_id} within {timeout_ms} ms{hint}")
         return result
 
     def __repr__(self) -> str:

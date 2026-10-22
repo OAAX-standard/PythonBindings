@@ -52,28 +52,40 @@ adds `src/` to `sys.path`.
 
 ## Usage
 
+This runs as shown, against the runtime `runtime-downloads/download_runtime.py`
+fetches and the model `examples/download_all_models.py` fetches (see
+[Layout](#layout) above for both commands):
+
 ```python
 import numpy as np
 from oaax import Runtime
 
-with Runtime("path/to/RuntimeLibrary.dll") as rt:
+with Runtime("runtime-downloads/CPU/RuntimeLibrary.dll") as rt:
     print(rt.name, rt.version)                      # available before init()
     rt.init({})                                      # pass runtime-specific options here, if any
 
-    model_id = rt.load_model("path/to/model")
-    inputs, outputs = rt.model_io(model_id)         # from runtime_get_info(), if reported
-    print(inputs)                                   # e.g. [TensorSpec(name='image', element_type=FLOAT, shape=(1, 3, 240, 320))]
+    model_id = rt.load_model("examples/Vision/Models/Face-Detection/model.onnx")
+    io = rt.model_io(model_id)                      # from runtime_get_info() - None if not reported (common; this runtime doesn't)
+    if io is not None:
+        inputs, outputs = io
+        print(inputs)                                # e.g. [TensorSpec(name='input', element_type=FLOAT, shape=(1, 3, 240, 320))]
 
     image = np.random.rand(1, 3, 240, 320).astype(np.float32)
-    result = rt.run(model_id, {"image": image}, timeout_ms=10_000)
+    result = rt.run(model_id, {"input": image}, timeout_ms=10_000)   # this model's real input name, not a placeholder
     for tensor in result:
         print(tensor.name, tensor.data.shape, tensor.data.dtype)
 ```
 
+A wrong input name (`{"image": image}` instead of `{"input": image}`, say)
+raises `ValueError` immediately when the runtime reports its expected inputs,
+or - as here, where it doesn't - eventually a `TimeoutError` whose message
+says so, rather than hanging with no explanation: see
+[Input name checking](#input-name-checking) below.
+
 Pipelined use mirrors the C interface directly:
 
 ```python
-ids = [rt.enqueue(model_id, {"image": frame}) for frame in frames]   # non-blocking
+ids = [rt.enqueue(model_id, {"input": frame}) for frame in frames]   # non-blocking
 while ids:
     result = rt.retrieve(timeout_ms=1000)          # any finished request, or None
     if result is not None:
@@ -120,10 +132,32 @@ runtime's `malloc` (`ucrtbase.dll` on Windows, libc elsewhere) and release
 outputs with the matching `free` after copying them into NumPy arrays. Your
 own arrays are never handed to the runtime and stay valid.
 
+### Input name checking
+
+The interface lets a runtime simply drop a request whose input names it
+doesn't recognise, rather than reporting an error - which otherwise surfaces
+as a confusing `TimeoutError` with no clue what actually went wrong. `rt.enqueue(...)`
+(and `rt.run(...)`, which calls it) checks your input names against this
+model's own reported inputs and raises `ValueError` immediately on a
+mismatch, naming exactly which names are missing or unexpected. This is
+best-effort: it only runs when the runtime actually reports a model's
+expected inputs via `runtime_get_info()`, which is optional per the
+interface and not every runtime does (the generic CPU runtime used throughout
+this README doesn't). When it can't check ahead of time, a resulting
+`TimeoutError`'s message says so, and that a dropped bad input name is a
+common cause worth checking.
+
 ## Tests
 
 The suite takes no defaults: you must supply a runtime library and a model
-file it can load.
+file it can load. For example, with what `runtime-downloads/download_runtime.py`
+and `examples/download_all_models.py` already fetched:
+
+```bash
+pytest tests --library runtime-downloads/CPU/RuntimeLibrary.dll --model examples/Vision/Models/Face-Detection/model.onnx
+```
+
+or, generally:
 
 ```bash
 pytest tests --library path/to/RuntimeLibrary.dll --model path/to/model
