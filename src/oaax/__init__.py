@@ -14,12 +14,22 @@ from Python with NumPy arrays::
             print(tensor.name, tensor.data.shape, tensor.data.dtype)
 """
 
+from importlib.metadata import PackageNotFoundError, version as _version
+from pathlib import Path
+
 from .enums import RuntimeStatus, TensorElementType
 from .exceptions import LibraryLoadError, OaaxError, RuntimeStatusError
 from .runtime import InferenceResult, ModelConfig, Runtime, TensorSpec, parse_dtype_name
 from .tensors import Tensor, dtype_to_element_type, element_type_to_dtype
 
-__version__ = "0.1.0"
+try:
+    # The normal case: oaax is installed (editable or not), so setuptools has
+    # already resolved VERSION into the package's own metadata.
+    __version__ = _version("oaax")
+except PackageNotFoundError:
+    # Running from a raw checkout without `pip install -e .`: read the repo's
+    # VERSION file directly. VERSION is the single source of truth either way.
+    __version__ = (Path(__file__).resolve().parents[2] / "VERSION").read_text().strip()
 
 __all__ = [
     "Runtime",

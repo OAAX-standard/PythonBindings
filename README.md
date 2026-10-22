@@ -146,3 +146,13 @@ Pass runtime-specific init options with `--config key=value` (repeatable),
 e.g. `--config device_type=GPU --config log_level=1`.
 
 See `tests/conftest.py` for the full option list.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a development
+environment, run the tests, and the project's commit/sign-off conventions.
+Notable changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE).

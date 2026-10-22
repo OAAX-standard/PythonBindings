@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oaax"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Python bindings for OAAX runtime libraries (interface.h, OAAX 2.0)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,11 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 oaax = ["py.typed"]
+
+[tool.setuptools.dynamic]
+# VERSION at the repo root is the single source of truth; oaax.__version__
+# reads it back out via importlib.metadata at import time (see src/oaax/__init__.py).
+version = { file = "VERSION" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
