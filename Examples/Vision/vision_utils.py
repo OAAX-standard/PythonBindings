@@ -1,16 +1,18 @@
-"""Shared helpers for OAAX vision examples that run object-detection models.
+"""Shared helpers for the OAAX vision examples.
 
 Covers the parts every such example needs: reading a model's ``model.json``
 metadata (its tensors and how to preprocess for it), preparing an image and
-any other inputs accordingly, decoding the "bboxes-format:xyxysc;..." output
-convention used by the OAAX illustrative examples, and drawing/saving the
-result. Import this from a script under Examples/Vision/<name>/ rather than
+any other inputs accordingly, and decoding the two output conventions the
+examples use - the "bboxes-format:xyxysc;..." detection tensors of the OAAX
+illustrative examples, and CTC character scores from a text recogniser.
+Import this from a script under Examples/Vision/<name>/ rather than
 duplicating it.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +24,8 @@ from oaax.enums import TensorElementType
 
 METADATA_FILENAME = "model.json"
 BOX_FORMAT_PREFIX = "bboxes-format:xyxysc;"
+CHANNEL_ORDERS = ("RGB", "BGR")
+RESIZE_MODES = ("stretch", "keep-aspect")
 
 # (label, confidence score, (x1, y1, x2, y2))
 Detection = tuple[str, float, tuple[float, float, float, float]]
@@ -33,13 +37,18 @@ class ModelInput:
 
     The image input carries per-channel ``mean`` and ``normalization``; the
     image is fed to the model as ``(pixel - mean) / normalization`` with
-    pixels in 0-255. Every other input carries a fixed ``value`` that is
-    broadcast to the input's shape.
+    pixels in 0-255, after reordering channels to ``channel_order`` (RGB by
+    default). ``resize`` is either "stretch" (resize to exactly the input's
+    H x W) or "keep-aspect" (match the height, keep proportions, pad the
+    right edge with the mean colour). Every other input carries a fixed
+    ``value`` that is broadcast to the input's shape.
     """
 
     spec: TensorSpec
     mean: tuple[float, ...] | None = None
     normalization: tuple[float, ...] | None = None
+    channel_order: str = "RGB"
+    resize: str = "stretch"
     value: float | None = None
 
     @property
@@ -48,10 +57,18 @@ class ModelInput:
 
 
 @dataclass(frozen=True)
+class ModelOutput:
+    """One model output; ``characters`` is set for a CTC text output (see :func:`ctc_decode`)."""
+
+    spec: TensorSpec
+    characters: list[str] | None = None
+
+
+@dataclass(frozen=True)
 class ModelMetadata:
     name: str
     inputs: list[ModelInput]
-    outputs: list[TensorSpec]
+    outputs: list[ModelOutput]
 
     @property
     def image_input(self) -> ModelInput:
@@ -70,10 +87,29 @@ def _parse_model_input(entry: dict) -> ModelInput:
     if has_mean:
         if len(spec.shape) != 4 or len(entry["mean"]) != spec.shape[1] or len(entry["normalization"]) != spec.shape[1]:
             raise SystemExit(f"input {spec.name!r}: an image input needs an (N, C, H, W) shape and one mean/normalization per channel")
-        return ModelInput(spec, mean=tuple(entry["mean"]), normalization=tuple(entry["normalization"]))
+        channel_order = entry.get("channel_order", "RGB")
+        if channel_order not in CHANNEL_ORDERS:
+            raise SystemExit(f"input {spec.name!r}: 'channel_order' must be one of {CHANNEL_ORDERS}, got {channel_order!r}")
+        resize = entry.get("resize", "stretch")
+        if resize not in RESIZE_MODES:
+            raise SystemExit(f"input {spec.name!r}: 'resize' must be one of {RESIZE_MODES}, got {resize!r}")
+        return ModelInput(spec, mean=tuple(entry["mean"]), normalization=tuple(entry["normalization"]), channel_order=channel_order, resize=resize)
     if "value" not in entry:
         raise SystemExit(f"input {spec.name!r}: a non-image input needs a fixed 'value'")
     return ModelInput(spec, value=entry["value"])
+
+
+def _parse_model_output(entry: dict, metadata_directory: Path) -> ModelOutput:
+    spec = _parse_tensor_spec(entry)
+    if "characters" not in entry:
+        return ModelOutput(spec)
+    characters = (metadata_directory / entry["characters"]).read_text(encoding="utf-8").splitlines()
+    if len(characters) + 2 != spec.shape[-1]:
+        raise SystemExit(
+            f"output {spec.name!r}: {entry['characters']} lists {len(characters)} characters, but the output has "
+            f"{spec.shape[-1]} classes; expected the characters plus a CTC blank and a space"
+        )
+    return ModelOutput(spec, characters)
 
 
 def load_model_metadata(model_path: Path) -> ModelMetadata:
@@ -86,18 +122,33 @@ def load_model_metadata(model_path: Path) -> ModelMetadata:
     inputs = [_parse_model_input(entry) for entry in raw["inputs"]]
     if sum(model_input.is_image for model_input in inputs) != 1:
         raise SystemExit(f"{metadata_path}: exactly one input must carry 'mean'/'normalization' (the image)")
-    return ModelMetadata(raw["name"], inputs, [_parse_tensor_spec(entry) for entry in raw["outputs"]])
+    outputs = [_parse_model_output(entry, metadata_path.parent) for entry in raw["outputs"]]
+    return ModelMetadata(raw["name"], inputs, outputs)
 
 
 def load_and_preprocess_image(path: Path, image_input: ModelInput) -> tuple[np.ndarray, Image.Image]:
-    """Resize ``path`` to the model's input size and apply its mean/normalization.
+    """Resize ``path`` to the model's input size and apply its channel order and mean/normalization.
 
     Returns an NCHW array ready to feed the model, plus the resized PIL image
-    (the frame of reference for the boxes the model reports).
+    (the frame of reference for anything the model reports in image coordinates).
     """
     _batch, _channels, height, width = image_input.spec.shape
-    resized_image = Image.open(path).convert("RGB").resize((width, height))  # PIL size is (width, height)
-    pixel_array = np.asarray(resized_image, dtype=np.float32)  # HWC, values 0-255
+    source = Image.open(path).convert("RGB")
+    if image_input.resize == "stretch":
+        resized_image = source.resize((width, height))  # PIL size is (width, height)
+    else:
+        # keep-aspect: scale to the input height, pad the right edge with the mean colour
+        # so the padding normalises to zero; an image too wide to fit is squashed instead.
+        scaled_width = min(width, math.ceil(height * source.width / source.height))
+        fill = tuple(int(round(value)) for value in image_input.mean)
+        if image_input.channel_order == "BGR":
+            fill = fill[::-1]  # the mean is in the model's channel order; PIL wants RGB
+        resized_image = Image.new("RGB", (width, height), fill)
+        resized_image.paste(source.resize((scaled_width, height)), (0, 0))
+
+    pixel_array = np.asarray(resized_image, dtype=np.float32)  # HWC, RGB, values 0-255
+    if image_input.channel_order == "BGR":
+        pixel_array = pixel_array[..., ::-1]
     mean = np.asarray(image_input.mean, dtype=np.float32)
     normalization = np.asarray(image_input.normalization, dtype=np.float32)
     pixel_array = (pixel_array - mean) / normalization  # per channel, broadcast over the trailing C axis
@@ -183,3 +234,26 @@ def save_annotated_image(image: Image.Image, detections: list[Detection], output
         draw.rectangle((x1, y1, x2, y2), outline="lime", width=2)
         draw.text((x1 + 2, y1 + 2), f"{label} {score:.0%}", fill="lime")
     annotated_image.save(output_path)
+
+
+def ctc_decode(probabilities: np.ndarray, characters: list[str]) -> tuple[str, float]:
+    """Turn a ``[positions, classes]`` matrix of character probabilities into ``(text, confidence)``.
+
+    Follows the PaddleOCR convention for the class axis: class 0 is the CTC
+    blank, classes 1..len(characters) are ``characters`` in order, and the
+    last class is a space. Decoding keeps the most likely class at each
+    position, collapses consecutive repeats, and drops blanks; the confidence
+    is the mean probability of the characters kept.
+    """
+    best_classes = probabilities.argmax(axis=1)
+    best_probabilities = probabilities.max(axis=1)
+
+    keep = np.ones(len(best_classes), dtype=bool)
+    keep[1:] = best_classes[1:] != best_classes[:-1]  # collapse repeats (a blank in between separates real doubles)
+    keep &= best_classes != 0  # drop blanks
+    if not keep.any():
+        return "", 0.0
+
+    class_labels = ["", *characters, " "]
+    text = "".join(class_labels[class_id] for class_id in best_classes[keep])
+    return text, float(best_probabilities[keep].mean())

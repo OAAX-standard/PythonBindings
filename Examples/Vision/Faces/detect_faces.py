@@ -21,9 +21,9 @@ from pathlib import Path
 SCRIPT_DIRECTORY = Path(__file__).parent
 DEFAULT_IMAGE_PATH = SCRIPT_DIRECTORY / "faces.jpg"
 
-sys.path.insert(0, str(SCRIPT_DIRECTORY.parent))  # Examples/Vision/, for detection_utils
+sys.path.insert(0, str(SCRIPT_DIRECTORY.parent))  # Examples/Vision/, for vision_utils
 
-from detection_utils import build_model_inputs, describe_output, load_model_metadata, save_annotated_image  # noqa: E402
+from vision_utils import build_model_inputs, describe_output, load_model_metadata, save_annotated_image  # noqa: E402
 
 from oaax import Runtime  # noqa: E402
 

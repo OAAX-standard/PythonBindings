@@ -1,0 +1,22 @@
+{
+  "name": "Text-Recognition",
+  "inputs": [
+    {
+      "name": "x",
+      "element_type": "FLOAT",
+      "shape": [1, 3, 48, 320],
+      "channel_order": "BGR",
+      "resize": "keep-aspect",
+      "mean": [127.5, 127.5, 127.5],
+      "normalization": [127.5, 127.5, 127.5]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "softmax_11.tmp_0",
+      "element_type": "FLOAT",
+      "shape": [1, 40, 6625],
+      "characters": "characters.txt"
+    }
+  ]
+}

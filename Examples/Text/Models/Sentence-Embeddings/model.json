@@ -1,0 +1,31 @@
+{
+  "name": "Sentence-Embeddings",
+  "tokenizer": "tokenizer.json",
+  "inputs": [
+    {
+      "name": "input_ids",
+      "element_type": "INT64",
+      "shape": [1, 128],
+      "role": "token_ids"
+    },
+    {
+      "name": "attention_mask",
+      "element_type": "INT64",
+      "shape": [1, 128],
+      "role": "attention_mask"
+    },
+    {
+      "name": "token_type_ids",
+      "element_type": "INT64",
+      "shape": [1, 128],
+      "role": "token_type_ids"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "last_hidden_state",
+      "element_type": "FLOAT",
+      "shape": [1, 128, 384]
+    }
+  ]
+}

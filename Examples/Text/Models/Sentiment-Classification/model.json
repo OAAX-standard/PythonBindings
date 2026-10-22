@@ -1,0 +1,26 @@
+{
+  "name": "Sentiment-Classification",
+  "tokenizer": "tokenizer.json",
+  "inputs": [
+    {
+      "name": "input_ids",
+      "element_type": "INT64",
+      "shape": [1, 128],
+      "role": "token_ids"
+    },
+    {
+      "name": "attention_mask",
+      "element_type": "INT64",
+      "shape": [1, 128],
+      "role": "attention_mask"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "logits",
+      "element_type": "FLOAT",
+      "shape": [1, 2],
+      "labels": ["NEGATIVE", "POSITIVE"]
+    }
+  ]
+}

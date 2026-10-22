@@ -13,8 +13,8 @@ model format.
 | --- | --- |
 | `src/oaax/` | The Python package (`import oaax`). |
 | `tests/` | Pytest smoke test: load a library, feed random data, check the output. You supply the library and model. |
-| `Examples/` | Sample scripts showing the package in use, e.g. `Examples/Vision/Faces/` runs a face detector on an image. |
-| `Examples/Vision/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and preprocessing. |
+| `Examples/` | Sample scripts showing the package in use. Vision: `Faces/` detects faces in an image, `OCR/` reads a line of text from one. Text: `Sentiment/` classifies a sentence as positive or negative, `Similarity/` compares sentences by meaning. Audio: `Speech/` transcribes a clip with Whisper. |
+| `Examples/*/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and how to prepare its inputs, and (for models sourced from the web rather than authored for this repo) a `download_model.py` that fetches the rest. |
 | `OAAX/` | The OAAX specification repository as a git submodule (branch `oaax-2.0`). |
 
 The package lives under `src/` because Windows file systems are case
@@ -22,8 +22,13 @@ insensitive, so a top-level `oaax/` directory would collide with the `OAAX/`
 submodule.
 
 No runtime library is checked in; point the package, tests and examples at
-whatever runtime you're working with. The only bundled models are the small
-ones under `Examples/Vision/Models/` that the examples need.
+whatever runtime you're working with. Model weights/tokenizers sourced from
+the web aren't checked in either - run that model's `download_model.py`
+first (each example's own README says so too), or fetch every one at once:
+
+```bash
+python Examples/download_all_models.py
+```
 
 For the generic (non-vendor-specific) CPU runtime, `RuntimeDownloads/download_runtime.py`
 fetches the right prebuilt archive for your OS/architecture and unpacks it
