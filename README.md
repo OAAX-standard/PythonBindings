@@ -54,17 +54,28 @@ adds `src/` to `sys.path`.
 
 This runs as shown, against the runtime `runtime-downloads/download_runtime.py`
 fetches and the model `examples/download_all_models.py` fetches (see
-[Layout](#layout) above for both commands):
+[Layout](#layout) above for both commands) - neither is cloned with the
+repo, so the snippet checks for them first rather than failing on a path
+that doesn't exist yet:
 
 ```python
+from pathlib import Path
+
 import numpy as np
 from oaax import Runtime
 
-with Runtime("runtime-downloads/CPU/RuntimeLibrary.dll") as rt:
+library_path = Path("runtime-downloads/CPU/RuntimeLibrary.dll")
+model_path = Path("examples/Vision/Models/Face-Detection/model.onnx")
+if not library_path.is_file():
+    raise SystemExit(f"{library_path} not found; fetch it: python runtime-downloads/download_runtime.py")
+if not model_path.is_file():
+    raise SystemExit(f"{model_path} not found; fetch it: python examples/Vision/Models/Face-Detection/download_model.py")
+
+with Runtime(library_path) as rt:
     print(rt.name, rt.version)                      # available before init()
     rt.init({})                                      # pass runtime-specific options here, if any
 
-    model_id = rt.load_model("examples/Vision/Models/Face-Detection/model.onnx")
+    model_id = rt.load_model(model_path)
     io = rt.model_io(model_id)                      # from runtime_get_info() - None if not reported (common; this runtime doesn't)
     if io is not None:
         inputs, outputs = io
