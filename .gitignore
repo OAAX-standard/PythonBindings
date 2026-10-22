@@ -1,13 +1,14 @@
-RuntimeDownloads/*
-!RuntimeDownloads/download_runtime.py
-ModelDownloads/*
-!ModelDownloads/.gitkeep
+runtime-downloads/*
+!runtime-downloads/download_runtime.py
+model-downloads/*
+!model-downloads/.gitkeep
+!model-downloads/README.md
 
-# Model weights/tokenizers fetched by each Examples/*/Models/<Name>/download_model.py;
+# Model weights/tokenizers fetched by each examples/*/Models/<Name>/download_model.py;
 # model.json (hand-authored metadata) and the download script itself stay tracked.
-Examples/*/Models/*/*
-!Examples/*/Models/*/model.json
-!Examples/*/Models/*/download_model.py
+examples/*/Models/*/*
+!examples/*/Models/*/model.json
+!examples/*/Models/*/download_model.py
 
 # Python
 __pycache__/
@@ -25,5 +26,5 @@ runtime.log
 *.log
 *.blob
 
-# Annotated images an Examples/ script writes next to its input
+# Annotated images an examples/ script writes next to its input
 *.detections.jpg

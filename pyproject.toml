@@ -16,7 +16,7 @@ test = ["pytest>=7"]
 # Lets oaax.onnx_introspect read a model's input/output specs straight from
 # an .onnx file when a runtime doesn't report them via runtime_get_info().
 onnx = ["onnx>=1.14"]
-# Extra dependencies used by the sample scripts under Examples/: Pillow for the
+# Extra dependencies used by the sample scripts under examples/: Pillow for the
 # vision examples' image I/O, tokenizers for the text examples' tokenizer.json files.
 examples = ["pillow>=10", "tokenizers>=0.15"]
 

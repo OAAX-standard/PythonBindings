@@ -13,8 +13,10 @@ model format.
 | --- | --- |
 | `src/oaax/` | The Python package (`import oaax`). |
 | `tests/` | Pytest smoke test: load a library, feed random data, check the output. You supply the library and model. |
-| `Examples/` | Sample scripts showing the package in use. Vision: `Faces/` detects faces in an image, `OCR/` reads a line of text from one. Text: `Sentiment/` classifies a sentence as positive or negative, `Similarity/` compares sentences by meaning. Audio: `Speech/` transcribes a clip with Whisper. |
-| `Examples/*/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and how to prepare its inputs, and (for models sourced from the web rather than authored for this repo) a `download_model.py` that fetches the rest. |
+| `examples/` | Sample scripts showing the package in use. Vision: `Faces/` detects faces in an image, `OCR/` reads a line of text from one. Text: `Sentiment/` classifies a sentence as positive or negative, `Similarity/` compares sentences by meaning. Audio: `Speech/` transcribes a clip with Whisper. |
+| `examples/*/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and how to prepare its inputs, and (for models sourced from the web rather than authored for this repo) a `download_model.py` that fetches the rest. |
+| `runtime-downloads/` | `download_runtime.py` fetches the generic CPU runtime here (see below); otherwise a gitignored scratch space for whatever runtime library you're testing with. |
+| `model-downloads/` | A gitignored scratch space for model files you're testing with; see its own README. |
 | `OAAX/` | The OAAX specification repository as a git submodule (branch `oaax-2.0`). |
 
 The package lives under `src/` because Windows file systems are case
@@ -27,15 +29,15 @@ the web aren't checked in either - run that model's `download_model.py`
 first (each example's own README says so too), or fetch every one at once:
 
 ```bash
-python Examples/download_all_models.py
+python examples/download_all_models.py
 ```
 
-For the generic (non-vendor-specific) CPU runtime, `RuntimeDownloads/download_runtime.py`
+For the generic (non-vendor-specific) CPU runtime, `runtime-downloads/download_runtime.py`
 fetches the right prebuilt archive for your OS/architecture and unpacks it
-into `RuntimeDownloads/CPU/`:
+into `runtime-downloads/CPU/`:
 
 ```bash
-python RuntimeDownloads/download_runtime.py
+python runtime-downloads/download_runtime.py
 ```
 
 ## Installation
