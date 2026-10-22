@@ -3,10 +3,9 @@
 Covers the parts every such example needs: reading a model's ``model.json``
 metadata (its tensors and how to preprocess for it), preparing an image and
 any other inputs accordingly, and decoding the two output conventions the
-examples use - the "bboxes-format:xyxysc;..." detection tensors of the OAAX
-illustrative examples, and CTC character scores from a text recogniser.
-Import this from a script under examples/Vision/<name>/ rather than
-duplicating it.
+examples use - UltraFace's separate (scores, boxes) anchor-based detector
+output, and CTC character scores from a text recogniser. Import this from a
+script under examples/Vision/<name>/ rather than duplicating it.
 """
 
 from __future__ import annotations
@@ -23,9 +22,9 @@ from oaax import Tensor, TensorSpec
 from oaax.enums import TensorElementType
 
 METADATA_FILENAME = "model.json"
-BOX_FORMAT_PREFIX = "bboxes-format:xyxysc;"
 CHANNEL_ORDERS = ("RGB", "BGR")
 RESIZE_MODES = ("stretch", "keep-aspect")
+OUTPUT_ROLES = ("scores", "boxes")
 
 # (label, confidence score, (x1, y1, x2, y2))
 Detection = tuple[str, float, tuple[float, float, float, float]]
@@ -58,10 +57,18 @@ class ModelInput:
 
 @dataclass(frozen=True)
 class ModelOutput:
-    """One model output; ``characters`` is set for a CTC text output (see :func:`ctc_decode`)."""
+    """One model output.
+
+    ``characters`` is set for a CTC text output (see :func:`ctc_decode`).
+    ``role`` (``"scores"`` or ``"boxes"``) marks one half of UltraFace's
+    detector output pair (see :func:`decode_ultraface_detections`); ``labels``
+    names the scores output's classes, index 0 being background.
+    """
 
     spec: TensorSpec
     characters: list[str] | None = None
+    role: str | None = None
+    labels: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -101,15 +108,19 @@ def _parse_model_input(entry: dict) -> ModelInput:
 
 def _parse_model_output(entry: dict, metadata_directory: Path) -> ModelOutput:
     spec = _parse_tensor_spec(entry)
-    if "characters" not in entry:
-        return ModelOutput(spec)
-    characters = (metadata_directory / entry["characters"]).read_text(encoding="utf-8").splitlines()
-    if len(characters) + 2 != spec.shape[-1]:
-        raise SystemExit(
-            f"output {spec.name!r}: {entry['characters']} lists {len(characters)} characters, but the output has "
-            f"{spec.shape[-1]} classes; expected the characters plus a CTC blank and a space"
-        )
-    return ModelOutput(spec, characters)
+    if "characters" in entry:
+        characters = (metadata_directory / entry["characters"]).read_text(encoding="utf-8").splitlines()
+        if len(characters) + 2 != spec.shape[-1]:
+            raise SystemExit(
+                f"output {spec.name!r}: {entry['characters']} lists {len(characters)} characters, but the output has "
+                f"{spec.shape[-1]} classes; expected the characters plus a CTC blank and a space"
+            )
+        return ModelOutput(spec, characters=characters)
+
+    role = entry.get("role")
+    if role is not None and role not in OUTPUT_ROLES:
+        raise SystemExit(f"output {spec.name!r}: 'role' must be one of {OUTPUT_ROLES}, got {role!r}")
+    return ModelOutput(spec, role=role, labels=entry.get("labels"))
 
 
 def load_model_metadata(model_path: Path) -> ModelMetadata:
@@ -168,59 +179,117 @@ def build_model_inputs(metadata: ModelMetadata, image_path: Path) -> tuple[list[
     return model_inputs, resized_image
 
 
-def parse_class_names(output_name: str) -> dict[int, str] | None:
-    """'bboxes-format:xyxysc;0:face;1:...' -> {0: 'face', 1: ...}; None if the name doesn't follow that convention."""
-    if not output_name.startswith(BOX_FORMAT_PREFIX):
-        return None
-    class_names_by_id = {}
-    for entry in output_name[len(BOX_FORMAT_PREFIX) :].split(";"):
-        class_id, _, class_name = entry.partition(":")
-        if class_id.isdigit():
-            class_names_by_id[int(class_id)] = class_name
-    return class_names_by_id
+def outputs_by_role(metadata: ModelMetadata, inference_outputs: list[Tensor]) -> dict[str, Tensor]:
+    """Pick out the ``"scores"``/``"boxes"`` tensors an anchor-based detector's model.json names by role."""
+    tensors_by_name = {tensor.name: tensor for tensor in inference_outputs}
+    return {output.role: tensors_by_name[output.spec.name] for output in metadata.outputs if output.role is not None}
 
 
-def scale_up_normalized_boxes(rows: np.ndarray, image_size: tuple[int, int]) -> np.ndarray:
-    """If every box in ``rows`` (columns [x1, y1, x2, y2, ...]) is a [0, 1] fraction rather than a
-    pixel coordinate, scale it up to pixels of ``image_size`` (width, height); otherwise return as-is.
+def _non_max_suppression(boxes: np.ndarray, scores: np.ndarray, iou_threshold: float) -> np.ndarray:
+    """Greedy IoU-based NMS: keep the highest-scoring box, drop anything that overlaps it past
+    ``iou_threshold``, repeat with what's left. ``boxes`` are corner-form (x1, y1, x2, y2).
+    Returns the kept row indices, highest score first. Standard algorithm; this implementation
+    follows the reference one in Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB (MIT licensed).
     """
-    if rows.size == 0:
-        return rows
-    boxes = rows[:, :4]
-    if not np.all((boxes >= 0.0) & (boxes <= 1.0)):
-        return rows  # already in pixel coordinates
+    order = np.argsort(scores)[::-1]
+    keep: list[int] = []
+    while order.size:
+        current, rest = order[0], order[1:]
+        keep.append(int(current))
+        if rest.size == 0:
+            break
+        overlap_x1 = np.maximum(boxes[current, 0], boxes[rest, 0])
+        overlap_y1 = np.maximum(boxes[current, 1], boxes[rest, 1])
+        overlap_x2 = np.minimum(boxes[current, 2], boxes[rest, 2])
+        overlap_y2 = np.minimum(boxes[current, 3], boxes[rest, 3])
+        intersection = np.clip(overlap_x2 - overlap_x1, 0, None) * np.clip(overlap_y2 - overlap_y1, 0, None)
+        area_current = (boxes[current, 2] - boxes[current, 0]) * (boxes[current, 3] - boxes[current, 1])
+        area_rest = (boxes[rest, 2] - boxes[rest, 0]) * (boxes[rest, 3] - boxes[rest, 1])
+        iou = intersection / (area_current + area_rest - intersection + 1e-5)
+        order = rest[iou <= iou_threshold]
+    return np.array(keep, dtype=np.int64)
+
+
+# --- UltraFace anchor decode -------------------------------------------
+#
+# UltraFace's "boxes" output is raw regression offsets relative to a fixed
+# set of anchor ("prior") boxes - a plain Concat of the regression heads,
+# no decode baked into the graph - not already-decoded coordinates. The
+# prior boxes and the decode formula below are specific to this
+# architecture at its 320x240 input resolution and come straight from its
+# own reference implementation, MIT licensed:
+# https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB
+# (vision/utils/box_utils.py's generate_priors()/convert_locations_to_boxes(),
+# vision/ssd/config/fd_config.py's per-layer feature map and anchor sizes).
+
+_PRIOR_FEATURE_MAP_SIZES = ((40, 30), (20, 15), (10, 8), (5, 4))  # (width, height) cells, per layer
+_PRIOR_ANCHOR_SIZES_PX = ((10, 16, 24), (32, 48), (64, 96), (128, 192, 256))  # anchor box sizes, per layer
+_PRIOR_IMAGE_SIZE = (320, 240)  # (width, height) this prior set is built for
+_PRIOR_CENTER_VARIANCE = 0.1
+_PRIOR_SIZE_VARIANCE = 0.2
+
+
+def _generate_priors() -> np.ndarray:
+    """The fixed anchor ("prior") boxes UltraFace's regression output is relative to.
+
+    One row per anchor, ``(center_x, center_y, width, height)`` as a fraction
+    of the image size. Always the same 4420 boxes for this architecture at
+    320x240, so this only ever needs computing once (see module load below).
+    """
+    image_width, image_height = _PRIOR_IMAGE_SIZE
+    priors = [
+        (center_x, center_y, anchor_size / image_width, anchor_size / image_height)
+        for (cells_wide, cells_high), anchor_sizes in zip(_PRIOR_FEATURE_MAP_SIZES, _PRIOR_ANCHOR_SIZES_PX)
+        for row in range(cells_high)
+        for col in range(cells_wide)
+        for center_x, center_y in [((col + 0.5) / cells_wide, (row + 0.5) / cells_high)]
+        for anchor_size in anchor_sizes
+    ]
+    return np.clip(np.array(priors, dtype=np.float64), 0.0, 1.0)
+
+
+_PRIORS = _generate_priors()  # computed once at import time; every call below reuses it
+
+
+def _decode_ultraface_boxes(raw_boxes: np.ndarray) -> np.ndarray:
+    """Turn UltraFace's raw per-anchor regression output into normalized ``(x1, y1, x2, y2)`` boxes."""
+    center = raw_boxes[:, :2] * _PRIOR_CENTER_VARIANCE * _PRIORS[:, 2:] + _PRIORS[:, :2]
+    size = np.exp(raw_boxes[:, 2:] * _PRIOR_SIZE_VARIANCE) * _PRIORS[:, 2:]
+    return np.concatenate([center - size / 2, center + size / 2], axis=1)
+
+
+def decode_ultraface_detections(
+    scores: Tensor,
+    boxes: Tensor,
+    labels: list[str] | None,
+    confidence_threshold: float,
+    image_size: tuple[int, int],
+    iou_threshold: float = 0.3,
+) -> list[Detection]:
+    """Decode UltraFace's raw ``(scores, boxes)`` output pair into detections.
+
+    ``scores`` is ``[1, num_priors, num_classes]`` (class 0 is background);
+    ``boxes`` is ``[1, num_priors, 4]``, raw per-anchor regression output (see
+    ``_decode_ultraface_boxes``). ``image_size`` is the (width, height) of the
+    image actually fed to the model, to scale the normalized boxes to pixels.
+    """
+    class_scores = scores.data[0]  # drop the batch axis
+    decoded_boxes = _decode_ultraface_boxes(boxes.data[0])
     width, height = image_size
-    rows = rows.astype(np.float64, copy=True)
-    rows[:, [0, 2]] *= width
-    rows[:, [1, 3]] *= height
-    return rows
-
-
-def describe_output(output_tensor: Tensor, confidence_threshold: float, image_size: tuple[int, int]) -> list[Detection]:
-    """Print what one output tensor contains; return any detections found in it.
-
-    ``image_size`` is the (width, height) of the image actually fed to the
-    model. Box coordinates are expected in pixels of that image, but some
-    models report them normalized to [0, 1] instead; those are detected and
-    scaled up automatically.
-    """
-    class_names_by_id = parse_class_names(output_tensor.name)
-    if class_names_by_id is None or output_tensor.data.ndim != 2 or output_tensor.data.shape[1] < 6:
-        # Not a bboxes-format tensor we know how to decode; report it as-is.
-        print(f"  {output_tensor.name}: shape={output_tensor.data.shape} dtype={output_tensor.data.dtype}")
-        return []
-
-    rows = scale_up_normalized_boxes(output_tensor.data[:, :6], image_size)
 
     detections: list[Detection] = []
-    for x1, y1, x2, y2, score, class_id in rows:
-        if score < confidence_threshold:
+    for class_id in range(1, class_scores.shape[1]):  # 0 is background
+        keep = class_scores[:, class_id] > confidence_threshold
+        if not keep.any():
             continue
-        label = class_names_by_id.get(int(class_id), f"class {int(class_id)}")
-        detections.append((label, float(score), (float(x1), float(y1), float(x2), float(y2))))
+        candidate_boxes, candidate_scores = decoded_boxes[keep], class_scores[keep, class_id]
+        picked = _non_max_suppression(candidate_boxes, candidate_scores, iou_threshold)
+        label = labels[class_id] if labels and class_id < len(labels) else f"class {class_id}"
+        for (x1, y1, x2, y2), score in zip(candidate_boxes[picked], candidate_scores[picked]):
+            detections.append((label, float(score), (float(x1) * width, float(y1) * height, float(x2) * width, float(y2) * height)))
 
     if not detections:
-        print(f"  {output_tensor.name}: no detections above {confidence_threshold:.0%} confidence")
+        print(f"  no detections above {confidence_threshold:.0%} confidence")
     for label, score, (x1, y1, x2, y2) in detections:
         print(f"  {label:<20} {score:5.1%}   box=({x1:.0f}, {y1:.0f}) - ({x2:.0f}, {y2:.0f})")
     return detections

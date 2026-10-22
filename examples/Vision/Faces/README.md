@@ -6,20 +6,24 @@ and print the faces it found.
 `detect_faces.py` works with any runtime library (Intel, a generic ONNX
 Runtime-backed CPU runtime, ...). Everything it needs to know about the
 *model* comes from a `model.json` sitting next to the model file - see
-[Model metadata](#model-metadata) below. The face-detection model itself lives
-in `../Models/Face-Detection/`:
+[Model metadata](#model-metadata) below. The face-detection model lives in
+`../Models/Face-Detection/`:
 
-| File | Use with |
+| File | Purpose |
 | --- | --- |
-| `model.onnx` | an ONNX Runtime-backed runtime (e.g. the generic CPU runtime) |
-| `model.fp32.intel.zip`, `model.fp16.intel.zip` | the Intel runtime (OpenVINO IR, full or half precision) |
-| `model.json` | every variant above - the metadata the script reads |
+| `model.onnx` | UltraFace `version-RFB-320` (Linzaer, WIDERFace-trained, MIT licensed) - not checked in, fetched by `download_model.py` |
+| `model.json` | the metadata the script reads |
+| `download_model.py` | fetches `model.onnx` |
 
 ## Setup
 
 ```bash
-pip install -e ".[examples]"   # from the repo root: adds Pillow
+pip install -e ".[examples]"       # from the repo root: adds Pillow
+python ../Models/Face-Detection/download_model.py   # fetches model.onnx
 ```
+
+`model.onnx` isn't checked into the repo; the script downloads it and is
+safe to re-run, it skips the download if already present.
 
 ## Run
 
@@ -33,12 +37,6 @@ For example, with a generic ONNX Runtime-backed CPU runtime:
 python detect_faces.py ../../../runtime-downloads/CPU/libRuntimeLibrary.so ../Models/Face-Detection/model.onnx
 ```
 
-or with the Intel runtime and its OpenVINO IR variant:
-
-```bash
-python detect_faces.py ../../../runtime-downloads/INTEL/RuntimeLibrary.dll ../Models/Face-Detection/model.fp32.intel.zip
-```
-
 Useful flags:
 
 - `--image path/to.jpg` - analyse a different image (default: the bundled `faces.jpg`).
@@ -50,52 +48,58 @@ Useful flags:
 
 The script never asks the runtime or the model file what the model's tensors
 look like; it reads a `model.json` from the same directory as the model file
-instead. One file describes every variant of a model:
+instead:
 
 ```json
 {
   "name": "Face-Detection",
   "inputs": [
-    { "name": "image-", "element_type": "FLOAT", "shape": [1, 3, 240, 320],
-      "mean": [127, 127, 127], "normalization": [128, 128, 128] },
-    { "name": "nms_sensitivity-", "element_type": "FLOAT", "shape": [1], "value": 0.5 }
+    { "name": "input", "element_type": "FLOAT", "shape": [1, 3, 240, 320],
+      "mean": [127, 127, 127], "normalization": [128, 128, 128] }
   ],
   "outputs": [
-    { "name": "bboxes-format:xyxysc;0:Face", "element_type": "FLOAT", "shape": [20, 6] }
+    { "name": "scores", "element_type": "FLOAT", "shape": [1, 4420, 2], "role": "scores", "labels": ["BACKGROUND", "face"] },
+    { "name": "boxes", "element_type": "FLOAT", "shape": [1, 4420, 4], "role": "boxes" }
   ]
 }
 ```
 
-- Exactly one input carries `mean` and `normalization` (one value per
-  channel): that's the image. It is resized to the input's `(H, W)` and fed
-  to the model as `(pixel - mean) / normalization`, with pixels in `0..255`
-  and channels in RGB order. Getting these two numbers wrong is the usual
-  reason a detector returns garbage.
-- Every other input carries a fixed `value`, broadcast to its shape (here a
-  neutral NMS sensitivity).
+- The one input carries `mean` and `normalization` (one value per channel).
+  It is resized to the input's `(H, W)` and fed to the model as
+  `(pixel - mean) / normalization`, with pixels in `0..255` and channels in
+  RGB order (the default; `channel_order: "BGR"` is also supported, see the
+  OCR example). Getting these two numbers wrong is the usual reason a
+  detector returns garbage.
+- `role: "scores"`/`role: "boxes"` mark the two halves of an anchor-based
+  ("SSD-style") detector's raw output: per-anchor class scores, and
+  per-anchor box regression offsets, neither NMS'd nor (for this model)
+  decoded into coordinates yet. `labels` names the scores output's classes,
+  index 0 always being background.
 - `element_type` is a name from the ONNX/OAAX element-type enum (`FLOAT`,
   `UINT8`, `INT64`, ...).
 
 ## Output
 
-Each output tensor named `bboxes-format:xyxysc;<id>:<name>;...` - the
-convention used by the OAAX illustrative examples, one row per box as
-`[x1, y1, x2, y2, score, class_id]` - is decoded into detections. Coordinates
-may be pixels of the resized input image or `[0, 1]` fractions of it; the
-latter are detected and scaled up. Any other output is still printed (name,
-shape, dtype), just not decoded.
+The `scores`/`boxes` pair is decoded by `vision_utils.decode_ultraface_detections`:
+per-anchor scores are thresholded per class, kept boxes are converted from
+UltraFace's raw regression output into pixel coordinates using its own fixed
+anchor layout (see the function's docstring for exactly where that layout
+comes from), and overlapping boxes for the same class are collapsed with
+standard IoU-based non-max suppression. This decode is specific to
+UltraFace's architecture, unlike the rest of `vision_utils.py`, which stays
+generic across models.
 
 Textual detections go to stdout, one per line, and whenever at least one
 clears the confidence threshold an annotated copy of the image is saved too:
 
 ```
 Runtime: OAAX CPU Runtime v2.0.0
-Model: Face-Detection - inputs ['image-', 'nms_sensitivity-']
+Model: Face-Detection - inputs ['input']
 
-1 output tensor(s):
-  Face                 100.0%   box=(208, 10) - (247, 71)
-  Face                 100.0%   box=(273, 180) - (309, 236)
-  Face                 100.0%   box=(274, 12) - (311, 69)
+2 output tensor(s):
+  face                 100.0%   box=(275, 12) - (313, 68)
+  face                 100.0%   box=(209, 9) - (247, 72)
+  face                 100.0%   box=(142, 11) - (177, 69)
   ...
 
 Saved an annotated copy to faces.detections.jpg

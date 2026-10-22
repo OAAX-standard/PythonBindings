@@ -5,9 +5,10 @@
 Defaults to the bundled faces.jpg. The model is described by a model.json in
 the same directory as <model_file> (see ../Models/Face-Detection/model.json):
 its input/output tensors, the mean/normalization to apply to the image, and
-fixed values for any other inputs. The detection output is expected to follow
-the "bboxes-format:xyxysc;<id>:<name>;..." naming convention used by the OAAX
-illustrative examples: each output row is [x1, y1, x2, y2, score, class_id].
+fixed values for any other inputs. The detector is expected to be UltraFace
+(or a compatible one), whose model.json marks one output "scores" and one
+"boxes" (see vision_utils.decode_ultraface_detections): raw per-anchor class
+scores and raw regression offsets, with neither decode nor NMS baked in.
 
     pip install -e .[examples]   # from the repo root: Pillow for image I/O
 """
@@ -23,7 +24,7 @@ DEFAULT_IMAGE_PATH = SCRIPT_DIRECTORY / "faces.jpg"
 
 sys.path.insert(0, str(SCRIPT_DIRECTORY.parent))  # examples/Vision/, for vision_utils
 
-from vision_utils import build_model_inputs, describe_output, load_model_metadata, save_annotated_image  # noqa: E402
+from vision_utils import build_model_inputs, decode_ultraface_detections, load_model_metadata, outputs_by_role, save_annotated_image  # noqa: E402
 
 from oaax import Runtime  # noqa: E402
 
@@ -66,14 +67,14 @@ def main() -> None:
         inference_result = runtime.run(model_id, model_inputs, timeout_ms=30_000)
 
         # --- Parse the result ---
-        # Each output tensor is either a set of detected boxes or some other
-        # data the model reports; describe_output() prints and decodes it.
+        # The model's two outputs - per-anchor class scores and raw box
+        # regression offsets - are matched up by the "role" their model.json
+        # entry declares, then jointly decoded (anchor decode, thresholding,
+        # NMS) into detections.
         print(f"\n{len(inference_result.outputs)} output tensor(s):")
-        detections = [
-            detection
-            for output_tensor in inference_result.outputs
-            for detection in describe_output(output_tensor, args.threshold, resized_image.size)
-        ]
+        by_role = outputs_by_role(metadata, inference_result.outputs)
+        labels = next((output.labels for output in metadata.outputs if output.role == "scores"), None)
+        detections = decode_ultraface_detections(by_role["scores"], by_role["boxes"], labels, args.threshold, resized_image.size)
 
         if detections:
             save_annotated_image(resized_image, detections, annotated_image_path)
