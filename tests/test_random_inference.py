@@ -29,11 +29,20 @@ def random_tensor(spec: TensorSpec, rng: np.random.Generator) -> Tensor:
         raise pytest.UsageError(f"input {spec.name!r} has unsupported type {spec.element_type}; pass --input to override")
     if dtype.kind == "f":
         data = rng.random(shape, dtype=np.float64).astype(dtype)
-    elif dtype.kind == "b":
+    elif dtype.kind in "biu":
+        # A tight 0/1 range, not a wide span clamped to the dtype's own limits:
+        # plenty of integer inputs are an index into a small lookup table (a
+        # token_type_ids embedding table can have as few as 2 rows), and this
+        # agnostic test has no way to know any given input's real valid range.
+        # An out-of-range index can make the runtime's own inference engine
+        # fail outright - and, worse, some runtimes don't surface that as an
+        # error status, so the request just never completes and this test
+        # hangs for the full timeout instead of failing fast. 0 or 1 stays a
+        # valid index into any table with at least one row, so it still
+        # exercises the real plumbing (shapes, dtypes, request/response
+        # matching) without risking a runtime-side failure this test has no
+        # way to anticipate or safely tell apart from a genuine bug.
         data = rng.integers(0, 2, size=shape).astype(dtype)
-    elif dtype.kind in "iu":
-        info = np.iinfo(dtype)
-        data = rng.integers(max(info.min, -128), min(info.max, 127) + 1, size=shape).astype(dtype)
     elif dtype.kind == "c":
         data = (rng.random(shape) + 1j * rng.random(shape)).astype(dtype)
     else:  # pragma: no cover - the dtype table only contains the kinds above
