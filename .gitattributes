@@ -1,0 +1,6 @@
+# Shell scripts must keep LF line endings regardless of a Windows checkout's
+# core.autocrlf: a CRLF-corrupted shebang line ("#!/bin/bash\r") breaks
+# execution when git (or anything else) invokes the file directly rather
+# than through an explicit `bash script.sh`, as scripts/check-signoff.sh is
+# once copied into .git/hooks/commit-msg.
+*.sh text eol=lf

@@ -17,6 +17,7 @@ model format.
 | `examples/*/Models/` | The models those examples use, one directory each, with a `model.json` describing its tensors and how to prepare its inputs, and (for models sourced from the web rather than authored for this repo) a `download_model.py` that fetches the rest. |
 | `runtime-downloads/` | `download_runtime.py` fetches the generic CPU runtime here (see below); otherwise a gitignored scratch space for whatever runtime library you're testing with. |
 | `model-downloads/` | A gitignored scratch space for model files you're testing with; see its own README. |
+| `scripts/` | Small developer-facing scripts not specific to any example; currently just `check-signoff.sh`, an optional local git hook (see [CONTRIBUTING.md](CONTRIBUTING.md)). |
 | `OAAX/` | The OAAX specification repository as a git submodule (branch `oaax-2.0`). |
 
 The package lives under `src/` because Windows file systems are case

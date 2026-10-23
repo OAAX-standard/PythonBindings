@@ -14,9 +14,17 @@ for commit message format, code style, and other project-wide guidelines.
 3. **Make your changes**, add or update tests where relevant.
 4. **Push** to your fork and **submit a pull request**.
 
+`main` is protected: every change, from anyone, goes through a pull request.
+A direct push straight to `main` is rejected by GitHub outright, there's no
+exception for maintainers or admins.
+
 Every commit must carry a `Signed-off-by` trailer (the Developer Certificate
 of Origin the general guide asks for), with a name and email matching the
-commit's own author. The easiest way is to pass `-s` to `git commit`:
+commit's own author. This is enforced automatically, not just requested: the
+[DCO GitHub App](https://probot.github.io/apps/dco/) checks every pull
+request and is a required status check on `main`, so a PR with a missing or
+mismatched sign-off cannot be merged. The easiest way to get it right is to
+pass `-s` to `git commit`:
 
 ```bash
 git commit -s -m "..."
@@ -25,6 +33,19 @@ git commit -s -m "..."
 If you forgot on an already-made commit, `git commit --amend -s` (one commit)
 or `git rebase --signoff <base>` (a whole branch) adds it after the fact, as
 long as you haven't pushed yet.
+
+To catch a mismatch before you even commit, rather than waiting for the PR
+check, install the same check as a local git hook:
+
+```bash
+cp scripts/check-signoff.sh .git/hooks/commit-msg
+chmod +x .git/hooks/commit-msg
+```
+
+It compares the trailer it's about to write against your current
+`git config user.name`/`user.email` and refuses the commit on a mismatch,
+explaining why. (Adapted from the same check in
+[OAAX-standard/reference-implementation](https://github.com/OAAX-standard/reference-implementation).)
 
 ---
 
