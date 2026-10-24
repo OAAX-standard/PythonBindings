@@ -1,4 +1,4 @@
 [submodule "OAAX"]
 	path = OAAX
-	url = git@github.com:OAAX-standard/OAAX.git
+	url = https://github.com/OAAX-standard/OAAX.git
 	branch = oaax-2.0
