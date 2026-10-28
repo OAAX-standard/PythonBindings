@@ -5,11 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "oaax"
 dynamic = ["version"]
+authors = [
+  { name="Josef Joubert", email="jjoubert@networkoptix.com" },
+]
 description = "Python bindings for OAAX runtime libraries (interface.h, OAAX 2.0)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 dependencies = ["numpy>=1.24"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/OAAX-standard/PythonBindings"
+Issues = "https://github.com/OAAX-standard/PythonBindings/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
