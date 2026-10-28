@@ -44,7 +44,8 @@ python runtime-downloads/download_runtime.py
 ## Installation
 
 ```bash
-pip install -e .          # package + numpy
+pip install oaax          # released package from PyPI
+pip install -e .          # from a checkout: package + numpy
 pip install -e .[test]    # also pytest
 ```
 
