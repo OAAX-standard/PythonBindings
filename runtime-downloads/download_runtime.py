@@ -32,7 +32,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TARGET_DIR = HERE / "CPU"
-BASE_URL = "https://oaax.nbg1.your-objectstorage.com/runtimes/oaax-v2/CPU"
+BASE_URL = "https://oaax.nbg1.your-objectstorage.com/runtimes/2.0.0/CPU"
 
 # (os, arch) -> (URL path segment, the main library file to expect after extraction)
 ARCHIVES: dict[tuple[str, str], tuple[str, str]] = {
