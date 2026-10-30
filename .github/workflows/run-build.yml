@@ -1,0 +1,31 @@
+name: Build
+
+"on":
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check package metadata
+        run: twine check dist/*
+
+      - name: Install the wheel in a clean venv and import it
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/venv/bin/python" -c "import oaax; expected = open('$GITHUB_WORKSPACE/VERSION').read().strip(); assert oaax.__version__ == expected, (oaax.__version__, expected); print('oaax', oaax.__version__)"

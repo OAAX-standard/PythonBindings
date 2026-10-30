@@ -1,0 +1,61 @@
+name: publish
+# Publishes the sdist and wheel to PyPI when a maintainer pushes a tag vX.Y.Z on main (OpenID Connect trusted publishing: no token is stored anywhere).
+# The `pypi` environment's required reviewer must approve before anything is uploaded.
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  build:
+    if: github.repository == 'OAAX-standard/PythonBindings'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag is on main and matches VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tag $GITHUB_REF_NAME is not on main"; exit 1; }
+          test "$(tr -d '[:space:]' < VERSION)" = "${GITHUB_REF_NAME#v}" || { echo "VERSION does not match tag $GITHUB_REF_NAME"; exit 1; }
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check package metadata
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/oaax/
+    permissions:
+      id-token: write   # trusted publishing; nothing else gets this permission
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist

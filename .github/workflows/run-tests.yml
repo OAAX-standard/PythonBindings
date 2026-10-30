@@ -1,0 +1,53 @@
+name: Tests
+
+"on":
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - run: pip install -e ".[test,onnx,examples]"
+
+      - name: Fetch the CPU runtime
+        run: python runtime-downloads/download_runtime.py
+
+      - name: Fetch the Face-Detection model
+        run: python examples/Vision/Models/Face-Detection/download_model.py
+
+      - name: Run tests
+        run: >
+          pytest tests
+          --library runtime-downloads/CPU/${{ runner.os == 'Windows' && 'RuntimeLibrary.dll' || 'libRuntimeLibrary.so' }}
+          --model examples/Vision/Models/Face-Detection/model.onnx
+          --junitxml=test-results.xml
+
+      - name: Fail if any test was skipped
+        shell: python
+        run: |
+          import sys
+          import xml.etree.ElementTree as ET
+          suite = ET.parse("test-results.xml").getroot()
+          if suite.tag == "testsuites":
+              suite = suite.find("testsuite")
+          skipped = int(suite.get("skipped", "0"))
+          if skipped:
+              sys.exit(f"{skipped} test(s) skipped; a skipped test does not count as a pass")
+
+      - name: Run the Faces example
+        run: >
+          python examples/Vision/Faces/detect_faces.py
+          runtime-downloads/CPU/${{ runner.os == 'Windows' && 'RuntimeLibrary.dll' || 'libRuntimeLibrary.so' }}
+          examples/Vision/Models/Face-Detection/model.onnx
