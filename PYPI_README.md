@@ -15,6 +15,20 @@ pip install oaax
 You need an OAAX runtime shared library (`.dll` on Windows, `.so` on Linux)
 and a model file that runtime can load. The package doesn't ship either.
 
+A generic CPU runtime, built on ONNX Runtime, is available as an archive for
+each platform:
+
+- Windows x86_64: <https://oaax.nbg1.your-objectstorage.com/runtimes/2.0.0/CPU/x86_64/Windows/library.tar.gz>
+- Linux x86_64: <https://oaax.nbg1.your-objectstorage.com/runtimes/2.0.0/CPU/x86_64/Ubuntu/library.tar.gz>
+- Linux aarch64: <https://oaax.nbg1.your-objectstorage.com/runtimes/2.0.0/CPU/aarch64/Ubuntu/library.tar.gz>
+
+Each archive contains the runtime library and the libraries it depends on.
+Unpack it and pass the library path to `Runtime(...)`.
+
+To try it with a real model, the examples use UltraFace, a face detection
+model (MIT licensed) available from
+<https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB>.
+
 ## Usage
 
 ```python

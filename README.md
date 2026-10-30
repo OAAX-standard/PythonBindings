@@ -25,7 +25,10 @@ insensitive, so a top-level `oaax/` directory would collide with the `OAAX/`
 submodule.
 
 No runtime library is checked in; point the package, tests and examples at
-whatever runtime you're working with. Model weights/tokenizers sourced from
+whatever runtime you're working with. The generic CPU runtime's archives are
+also available directly, for Windows x86_64 at
+<https://oaax.nbg1.your-objectstorage.com/runtimes/2.0.0/CPU/x86_64/Windows/library.tar.gz>
+(Linux and aarch64 links are in [PYPI_README.md](PYPI_README.md)). Model weights/tokenizers sourced from
 the web aren't checked in either - run that model's `download_model.py`
 first (each example's own README says so too), or fetch every one at once:
 
