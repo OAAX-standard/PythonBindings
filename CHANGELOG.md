@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Versions are listed new
 
 ---
 
+## 0.1.1 — 2026-10-30
+
+### Changed
+- The PyPI page now has its own README, with install and usage instructions, links to the generic CPU runtime archives and a public face detection model, and absolute links back to the repository.
+- Package metadata now lists the authors and project URLs, and uses the SPDX license string.
+
 ## 0.1.0 — 2026-10-22
 
 Initial release.
