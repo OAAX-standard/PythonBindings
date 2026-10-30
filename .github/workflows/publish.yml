@@ -1,48 +1,61 @@
 name: publish
-# Uploads the sdist and wheel of a GitHub Release to PyPI with trusted publishing (OpenID Connect: no token is stored anywhere).
-#   1. a tag vX.Y.Z builds the sdist and wheel and drafts the release with them and SHA256SUMS.
-#   2. a maintainer reviews the draft and presses Publish: this workflow starts, waits for the reviewer of the `pypi` environment,
-#      then uploads THE SAME files whose sha256 is in SHA256SUMS (they are not rebuilt).
-# One-time setup, on PyPI (Account > Publishing > pending publisher, or the org's project): project oaax, owner OAAX-standard,
-# repository PythonBindings, workflow publish.yml, environment pypi. On GitHub: the `pypi` environment (required reviewer, tags v* only).
+# Publishes the sdist and wheel to PyPI when a maintainer pushes a tag vX.Y.Z on main (OpenID Connect trusted publishing: no token is stored anywhere).
+# The `pypi` environment's required reviewer must approve before anything is uploaded.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
 
 permissions: {}
 
 jobs:
-  pypi:
-    if: github.repository == 'OAAX-standard/PythonBindings' && !github.event.release.prerelease
+  build:
+    if: github.repository == 'OAAX-standard/PythonBindings'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check the tag is on main and matches VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tag $GITHUB_REF_NAME is not on main"; exit 1; }
+          test "$(tr -d '[:space:]' < VERSION)" = "${GITHUB_REF_NAME#v}" || { echo "VERSION does not match tag $GITHUB_REF_NAME"; exit 1; }
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check package metadata
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/project/oaax/
     permissions:
-      contents: read    # download the release assets
       id-token: write   # trusted publishing; nothing else gets this permission
     steps:
-      - name: Take the sdist and wheel of this release and check they are the tagged ones
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: |
-          set -euo pipefail
-          mkdir release dist
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --pattern '*.tar.gz' --pattern SHA256SUMS --dir release
-          test "$(ls release/*.whl | wc -l)" = 1
-          test "$(ls release/*.tar.gz | wc -l)" = 1
-          version="${TAG#v}"
-          for file in $(cd release && ls *.whl *.tar.gz); do
-            # each file must be listed in the release's checksums, and its name must carry the tag's version
-            (cd release && grep -F "  $file" SHA256SUMS | sha256sum -c -)
-            case "$file" in
-              oaax-"$version"-*.whl | oaax-"$version".tar.gz) ;;
-              *) echo "$file does not match tag $TAG"; exit 1 ;;
-            esac
-            cp "release/$file" dist/
-          done
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
