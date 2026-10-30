@@ -9,6 +9,7 @@ authors = [
   { name="Josef Joubert", email="jjoubert@networkoptix.com" },
 ]
 description = "Python bindings for OAAX runtime libraries (interface.h, OAAX 2.0)"
+maintainers = [{ name="OAAX", email="pypi@oaax.org" }]
 readme = "PYPI_README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
